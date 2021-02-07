@@ -21,7 +21,7 @@ from odoo.exceptions import AccessDenied, AccessError, UserError, ValidationErro
 from odoo.http import request
 from odoo.osv import expression
 from odoo.service.db import check_super
-from odoo.tools import partition, pycompat, collections
+from odoo.tools import partition, pycompat, collections, config
 
 _logger = logging.getLogger(__name__)
 
@@ -600,7 +600,16 @@ class Users(models.Model):
     def _login(cls, db, login, password):
         if not password:
             raise AccessDenied()
-        ip = request.httprequest.environ['REMOTE_ADDR'] if request else 'n/a'
+        # Get IP from header
+        environ = request.httprequest.environ if request else {}
+        if config["proxy_mode"] and "HTTP_X_REAL_IP" in environ:
+            ip = environ["HTTP_X_REAL_IP"]
+        elif config["proxy_mode"] and "HTTP_X_FORWARDED_FOR" in environ:
+            ip = environ["HTTP_X_FORWARDED_FOR"]
+        elif config["proxy_mode"] and "REMOTE_ADDR" in environ:
+            ip = environ["REMOTE_ADDR"]
+        else:
+            ip = "n/a"
         try:
             with cls.pool.cursor() as cr:
                 self = api.Environment(cr, SUPERUSER_ID, {})[cls._name]
